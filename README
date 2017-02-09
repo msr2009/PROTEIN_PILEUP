@@ -12,7 +12,7 @@ The workflow requires four scripts:
 	
 In addition, the workflow also requires packages to do a lot of the heavy lifting:
 	1) PEAR (v0.9.5)
-	2) bowte2 (v2.0.2+)
+	2) bowtie2 (v2.0.2+)
 	3) pysam (v0.8.4) 
 	4) cutadapt
 	5) trim_galore
