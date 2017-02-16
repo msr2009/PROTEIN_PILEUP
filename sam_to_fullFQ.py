@@ -111,5 +111,5 @@ if __name__ == "__main__":
 		help = "only print mutated reads", default = False)
 	args = parser.parse_args()
 	
-	main(args.sam, args.wildtype, args.paired)	
+	main(args.sam, args.wildtype, args.paired, args.excludeWT)	
 
