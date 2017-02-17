@@ -88,17 +88,17 @@ H) Translate FASTQ file with translate_fastq.py
 	by the FASTQ read. It can output a FASTQ file that adds a quality score for each
 	codon (defined by --quality (mean, sum, min), this overrides the fasta output).
 	It can also output a plaintext file with a single translated read per line (by
-	using --nofasta). For this example, I use the --nofasta option, which outputs
-	the format for protein_pileup.py
+	using --nofasta). For sequence_pileup.py, output a FASTA file (without using
+	--nofasta or --quality).
 
 	If your amplicon sequence is not in-frame, you must set --offset (I've set it at
 	1 here), as that will start the translation in the correct frame.
 
-	python translate_fastq.py --fastq ALL.fq --offset 1 --nofasta > TRANSLATION.txt
+	python translate_fastq.py --fastq ALL.fq --offset 1 > TRANSLATION.txt
 
 I) Calculate pileup of protein sequence
 
 	sequence_pileup.py makes a pileup a la pysamstats. For each residue in the
 	translation, outputs the number of times each amino acid is found.
 
-	python protein_pileup.py -r TRANSLATION.TXT --protein > PILEUP.txt
+	python sequence_pileup.py -r TRANSLATION.TXT --protein > PILEUP.txt
