@@ -7,24 +7,31 @@ sorted file, one position per line
 Matt Rich, 02/2017
 """
 
+from sam_to_fullFQ import fasta_iter
+
 def main(reads, protein):
 	firstread = True
 	bases = {"protein": ['A', 'C', 'D', 'E', 'F', 'G', 'H', 
 						 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 
 						 'R', 'S', 'T', 'V', 'W', 'Y', '*', 'X'],
 			 "dna": ['A', 'C', 'G', 'T', 'N']}
-		
-	for line in open(reads, "r"):
-		l = line.strip()
+	
+	pileup_error = open("pileup_errors.out", "w")
+	
+	for line in fasta_iter(reads):
+		l = line[1]
 		if firstread:
-			print "firstread"
+			#print "firstread"
 			if protein == "protein":	
 				dat = {i:{x:0 for x in bases["protein"]} for i in range(len(l))}
 			else: 
 				dat = {i:{x:0 for x in bases["dna"]} for i in range(len(l))}
 			firstread = False
 		for x in range(len(l)):
-			dat[x][l[x]] += 1
+			try:
+				dat[x][l[x]] += 1
+			except KeyError:
+				print >> pileup_error, line[0] + "\tKeyError"
 
 	#print header
 	if protein == "protein":
@@ -43,7 +50,7 @@ if __name__ == "__main__":
 
 	parser = ArgumentParser()
 	parser.add_argument('--reads', '-r', action = 'store', type = str, dest = 'reads', 
-		help = "file containing reads (one per line)")
+		help = "FASTA file containing reads")
 	parser.add_argument('--protein', action = 'store_true', dest = 'protein', 
 		help = "reads are protein sequence", default=False)
 	
