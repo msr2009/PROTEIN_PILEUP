@@ -16,7 +16,7 @@ def main(reads, protein):
 						 'R', 'S', 'T', 'V', 'W', 'Y', '*', 'X'],
 			 "dna": ['A', 'C', 'G', 'T', 'N']}
 	
-	pileup_error = open("pileup_errors.out", "w")
+	pileup_error = open(reads.split(".fa")[0]+".errors.fa", "w")
 	
 	for line in fasta_iter(reads):
 		l = line[1]
@@ -31,7 +31,7 @@ def main(reads, protein):
 			try:
 				dat[x][l[x]] += 1
 			except KeyError:
-				print >> pileup_error, line[0] + "\tKeyError"
+				print >> pileup_error, ">"+line[0] + "\n" + line[1]
 
 	#print header
 	if protein == "protein":
