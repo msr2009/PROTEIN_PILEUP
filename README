@@ -56,7 +56,7 @@ D) Align unmerged reads to reference with bowtie2
 	single read would be inserted into the wildtype sequence:
 		
 		WT: 		AAACCGGTTACGTACGTAGAGAGTGTGTG
-		read: 					tacctagagtg
+		read: 		            tacctagagtg
 		new read: 	AAACCGGTTACGtacctagagtgTGTGTG
 
 	Similarly, paired reads will be inserted with the relevant intervening wildtype
