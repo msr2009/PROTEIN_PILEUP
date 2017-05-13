@@ -55,15 +55,9 @@ D) Align unmerged reads to reference with bowtie2
 	shotgun fragments into the context of the wildtype sequence. For example, a
 	single read would be inserted into the wildtype sequence:
 		
-<<<<<<< HEAD
 		WT:         AAACCGGTTACGTACGTAGAGAGTGTGTG
 		read:                   tacctagagtg
-		new read:mn AAACCGGTTACGtacctagagtgTGTGTG
-=======
-		WT: 		AAACCGGTTACGTACGTAGAGAGTGTGTG
-		read: 		            tacctagagtg
-		new read: 	AAACCGGTTACGtacctagagtgTGTGTG
->>>>>>> 217db987ceafd020f71b9b0f30a558326f956889
+		new read:   AAACCGGTTACGtacctagagtgTGTGTG
 
 	Similarly, paired reads will be inserted with the relevant intervening wildtype
 	sequence. Output as a FASTQ will use the aligned reads' base qualities, and a
