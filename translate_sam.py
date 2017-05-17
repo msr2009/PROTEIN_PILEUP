@@ -14,8 +14,9 @@ Matt Rich, 05/2017
 import pandas as pd
 import pysam
 from itertools import product, groupby
+from numpy import mean
 
-def main(sam, wildtype, offset, pileup_type, include_flank):
+def main(sam, wildtype, offset, pileup_type, include_flank, q):
 	#read wildtype FASTA file
 	for x in fasta_iter(wildtype):
 		wt_name, wt_seq = x
@@ -35,50 +36,55 @@ def main(sam, wildtype, offset, pileup_type, include_flank):
 	last_lookup = {0:0, 1:2, 2:1}
 
 	#open sam/bam file
-	if sam.endswith(".bam"):
-		samfile = pysam.AlignmentFile(sam, "rb")
-	elif sam.endswith(".sam"):
-		samfile = pysam.AlignmentFile(sam, "r")
-	else:
-		raise NameError("file is neither SAM nor BAM")
+	for s in sam:	
+		if s.endswith(".bam"):
+			samfile = pysam.AlignmentFile(s, "rb")
+		elif s.endswith(".sam"):
+			samfile = pysam.AlignmentFile(s, "r")
+		else:
+			raise NameError("{} is neither SAM nor BAM, skipping".format(s))
 
-	#loop through samfile
-	for read in samfile.fetch():
-		#skip if read has indels or Ns
-		if read.get_tag("XO") == 0 and "N" not in read.query_alignment_sequence:
-			"""
-			1) determine how many wildtype bases we need to add to each end of the
-			aligned segment
-			2) create new sequence by appending those bases on either end
-			3) loop through sequence, adding to pileup
-			"""
+		#loop through samfile
+		for read in samfile.fetch():
+			#skip if read has indels or Ns
+			if read.get_tag("XO") == 0 and "N" not in read.query_alignment_sequence:
+				"""
+				1) determine how many wildtype bases we need to add to each end of the
+				aligned segment
+				2) create new sequence by appending those bases on either end
+				3) loop through sequence, adding to pileup
+				"""
+				new_seq = ""
+				new_qual = []
+				first_pos = 0
 
-			new_seq = ""
-			first_pos = 0
-			if include_flank:
-				first_pos = read.reference_start-(read.reference_start+offset)%3
-				first = wt_seq[first_pos : read.reference_start]		
-				last = wt_seq[read.reference_end : read.reference_end+last_lookup[(read.reference_end+offset)%3]]	
-		 		new_seq = first + read.query_alignment_sequence + last
-			
-			else:
-				#if we're not appending wildtype sequences then we just take the
-				#in-frame part of the query_alignment_sequence
-				
-				first_pos = read.reference_start + (3-(read.reference_start+offset)%3)%3
-				new_seq = read.query_alignment_sequence[(3-(read.reference_start+offset)%3)%3:\
+				if include_flank:
+					first_pos = read.reference_start-(read.reference_start+offset)%3
+					first = wt_seq[first_pos : read.reference_start]		
+					last = wt_seq[read.reference_end : read.reference_end+last_lookup[(read.reference_end+offset)%3]]	
+		 			new_seq = first + read.query_alignment_sequence + last
+					new_qual = [30]*len(first) + read.query_alignment_qualities + [30]*len(last)
+
+				else:
+					#if we're not appending wildtype sequences then we just take the
+					#in-frame part of the query_alignment_sequence
+					
+					first_pos = read.reference_start + (3-(read.reference_start+offset)%3)%3
+					new_seq = read.query_alignment_sequence[(3-(read.reference_start+offset)%3)%3:\
 														-1*((read.reference_end+offset)%3)]			
-	
-			#weird stuff can happen if the reads start at the very beginning of the
-			#sequence, so skip anything where first_pos < 0
-			if read.reference_start-offset >= 0:
-				#add codons or translate, then add to pileup
-				for c in range(0,len(new_seq),3):
-					if pileup_type == "codon":
-						pileup[(first_pos+c)/3][new_seq[c:c+3]] += 1
-					elif pileup_type == "aa":
-						pileup[(first_pos+c)/3][translateSequence(new_seq[c:c+3])] += 1
-			
+					new_qual = read.query_alignment_qualities[(3-(read.reference_start+offset)%3)%3:\
+														-1*((read.reference_end+offset)%3)]			
+					
+				#weird stuff can happen if the reads start at the very beginning of the
+				#sequence, so skip anything where first_pos < 0
+				if read.reference_start-offset >= 0:
+					#add codons or translate, then add to pileup
+					for c in range(0,len(new_seq),3):
+						if mean(new_qual[c:c+3]) > q:
+							if pileup_type == "codon":
+								pileup[(first_pos+c)/3][new_seq[c:c+3]] += 1
+							elif pileup_type == "aa":
+								pileup[(first_pos+c)/3][translateSequence(new_seq[c:c+3])] += 1
 
 	#make a pandas dataframe (for easy printing) from pileup dict
 	pd_pileup = pd.DataFrame.from_dict(pileup, 'index')
@@ -137,8 +143,8 @@ if __name__ == "__main__":
 	from argparse import ArgumentParser
 
 	parser = ArgumentParser()
-	parser.add_argument('--sam', action = 'store', type = str, dest = 'sam', 
-		help = "sam or bam file")
+	parser.add_argument('sam', action = 'store', nargs="+",
+		help = "sam files to be counted (bam also supported)")
 	parser.add_argument('--wt', action = 'store', type = str, dest = 'wildtype', 
 		help = "fasta file containing wildtype sequence")
 	parser.add_argument('--offset', action = 'store', type = int, dest = 'offset',
@@ -146,11 +152,12 @@ if __name__ == "__main__":
 	parser.add_argument('--pileup-type', action = 'store', type = str, dest = 'pileup',
 		help = "pileup as codon or aa", default="codon")
 	parser.add_argument('-q', '--quality', action='store', type = int, dest='qual',
-		help = "minimum PHRED quality of mutations, default=20", default = 20)
+		help = "minimum PHRED quality of mutations, default=2", default = 2)
 	parser.add_argument('--include-flank', action = 'store_true', dest = 'include',
-		help = "pad reads with flanking wildtype sequence. By default, will shorten\
-				reads to first and last full codons.", default=False)
+		help = "pad reads with flanking wildtype sequence to create full codons.\
+				By default, will shorten reads to first and last full codons.", 
+		default=False)
 	args = parser.parse_args()
 	
-	main(args.sam, args.wildtype, args.offset, args.pileup, args.include)	
+	main(args.sam, args.wildtype, args.offset, args.pileup, args.include, args.qual)	
 
