@@ -1,17 +1,19 @@
-"""
-comments
+"
+output_codon_mutations.py
 
-Matt Rich, DATE
+Taking sam file as input, finds all mutations compared to reference 
+and outputs all codons that contain a mutation (along with the read name)
+
+output:
+		readname	codon_pos	ref_codon	alt_codon
+
+NB: this code requires that the reference starts in frame. 
+
+Matt Rich, 05/2017
 """
 
 from argparse import ArgumentParser
 import pysam
-
-#josh wants code that IDs codon-level mutations in his reads (per well)
-#from sam file, use pysam.get_aligned_pairs(with_seq=True) to id mutations
-#figure out which codon it's in, and take the codon that contains that mutation
-
-#requires that reference starts at beginning of a codon
 
 def output_codon_mutations(sam, offset):
 	for s in sam:
