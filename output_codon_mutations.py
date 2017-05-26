@@ -1,4 +1,4 @@
-"
+"""
 output_codon_mutations.py
 
 Taking sam file as input, finds all mutations compared to reference 
@@ -17,9 +17,9 @@ import pysam
 
 def output_codon_mutations(sam, offset):
 	for s in sam:
-		if s.endswith(".bam"):
+		if s.lower().endswith(".bam"):
 			samfile = pysam.AlignmentFile(s, "rb")
-		elif s.endswith(".sam"):
+		elif s.lower().endswith(".sam"):
 			samfile = pysam.AlignmentFile(s, "r")
 		else:
 			raise NameError("{} is neither SAM nor BAM, skipping".format(s))
