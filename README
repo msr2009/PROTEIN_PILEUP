@@ -1,25 +1,23 @@
 CREATING PROTEIN PILEUPS FROM SHOTGUN SEQUENCING READS
 
+Matt Rich (2017)
+
 This workflow uses converts short-read shotgun sequencing data of a library of 
 protein variants to a pileup showing the number of sequences at each
-position that cause a nonsynonymous amino acid change.
+position that cause a nonsynonymous amino acid change. 
 
-###UPDATED 2017.05.17
+In this workflow, you perform some initial read-wrangling with existing trimming 
+and aligning tools, then feed a SAM file into translate_sam.py, which creates a 
+pileup of the translation (or simply codons). translate_sam.py does not consider 
+linkage between mutations in the same read or read-pair (this information was 
+retained in previous versions of the pipeline, though not used otherwise.) 
 
-This update changes the way I calculate the pileup. Before, aligned sequences were
-filled with missing wildtype sequence (which could then be used as input for
-Enrich2, then translated and piled. This created a large enrichment of wildtype
-sequences in the pileup which had to be dealt with afterwards. Notably, dms_tools
-(from Jesse Bloom) seemed to normalize all this out during it's analysis. 
-
-In this workflow, all three of these scripts (sam_to_fullFQ.py, translate_fastq.py,
-and sequence_pileup.py) with one script (translate_sam.py), which creates a pileup
-of the translation (or simply codons) for only the sequenced reads (no wildtype
-padding as in the original workflow). translate_sam.py does not consider linkage
-between mutations in the same read or read-pair (this information was retained by
-the sam_to_fullFQ, though not used otherwise.)
-
-The initial read merging and aligning steps are the same as before. 
+Briefly, the pipeline described below trims reads to a specific amplicon, attempts
+to merge pairs as necessary, then aligns them to a reference. The merging step is 
+important -- this makes sure that no reads are double-counted during analysis. All 
+these steps can be performed as below or with what ever other tools you like. The 
+input to translate_sam.py must be SAM files containing only aligned reads to only 
+the sequence you wish to translate and pileup. 
 
 This workflow requires one script -- translate_sam.py -- and the following packages:
 	1) PEAR (v0.9.5)
@@ -42,8 +40,8 @@ B) Use PEAR to merge overlapping reads
 	PEAR will output three fastq files: one containing the merged reads, then one
 	file for each of the forward and reverse reads that could not be merged. 
 	NB: some of these reads will have very short overlaps -- I dealt with these in
-	sam_to_fullFQ.py (this step is currently greedy, though, so it doesn't take any 
-	quality scores into account). 
+	sam_to_fullFQ.py (this step is greedy, though, so it doesn't take any quality 
+	scores into account). 
 
 C) Align merged reads to reference with bowtie2
 	
@@ -93,106 +91,4 @@ E) Use translate_sam.py to create and print pileup
 			least, there are some edge cases that break the script if you use this
 			and I don't want to go in and try to address them). 
 
-	The pileup is printed to STDOUT.
-
-
-###OLD WORKFLOW
-
-The workflow requires four scripts:
-	1) sam_to_fullFQ.py
-	2) translate_fastq.py
-	3) sequence_pileup.py
-	4) fastq_tools.py (written by Alan Rubin)
-	
-In addition, the workflow also requires packages to do a lot of the heavy lifting:
-	1) PEAR (v0.9.5)
-	2) bowtie2 (v2.0.2+)
-	3) pysam (v0.8.4) 
-	4) cutadapt
-	5) trim_galore
-
-##STEP 1: MERGE AND ALIGN READS##
-
-A) Use trim_galore (or just cutadapt or whatever read trimmer you like) to 
-	remove nextera adapter sequences from the reads:
-
-	trim_galore --length 20 --nextera INPUT.fq --paired --stringency 5
-
-B) Use PEAR to merge overlapping reads
-
-	pear -f INPUT_F.fq -r INPUT_R.fq -o PEAR_MERGED.fq
-
-	PEAR will output three fastq files: one containing the merged reads, then one
-	file for each of the forward and reverse reads that could not be merged. 
-	NB: some of these reads will have very short overlaps -- I dealt with these in
-	sam_to_fullFQ.py (this step is currently greedy, though, so it doesn't take any 
-	quality scores into account). 
-
-C) Align merged reads to reference with bowtie2
-	
-	(You'll need to use bowtie2-build to make this reference first, but I'm not
-	including how to do that here. It's easy. Use a FASTA file that only contains
-	your amplicon)
-
-	bowtie2 --end-to-end --no-unal -x REF -U PEAR_MERGED.fq -S PEAR_MERGED.sam
-
-D) Align unmerged reads to reference with bowtie2
-	
-	(PEAR outputs the reverse read as its reverse-complement, so we have to use the
-	--ff option for bowtie2. Also, we don't want any mixed or discordant reads).
-	
-	bowtie2 --no-discordant --no-mixed --end-to-end --no-unal --ff -x REF -1 PEAR_UNMERGED_F.fq -2 PEAR_UNMERGED_R.fq -S PEAR_UNMERGED.sam
-
-##STEP 2: CONVERT READS FROM SAM TO FASTQ##
-
-	For both of these initial steps, you use sam_to_fullFQ.py to integrate the
-	shotgun fragments into the context of the wildtype sequence. For example, a
-	single read would be inserted into the wildtype sequence:
-		
-		WT:         AAACCGGTTACGTACGTAGAGAGTGTGTG
-		read:                   tacctagagtg
-		new read:   AAACCGGTTACGtacctagagtgTGTGTG
-
-	Similarly, paired reads will be inserted with the relevant intervening wildtype
-	sequence. Output as a FASTQ will use the aligned reads' base qualities, and a
-	quality score of 30 for all other wildtype bases not contained in the read. 
-	
-	NB: sam_to_fullFQ.py can output only reads that are mutated using the
-	--excludeWT option
-
-E) Convert PEAR_MERGED.sam to FASTQ	
-	
-	python sam_to_fullFQ.py --sam PEAR_MERGED.sam --wt REF.fa > PEAR_MERGED.full.fq
-
-	(REF.fa is the fasta file used to create bowtie2 references)
-
-F) Convert PEAR_UNMERGED.sam to FASTQ
-
-	python sam_fullFQ.py --sam PEAR_UNMERGED.sam --wt REF.fa --paired > PEAR_UNMERGED.full.fq
-
-G) Concatenate FASTQs
-
-	cat PEAR_UNMERGED.full.fq PEAR_MERGED.full.fq > ALL.fq
-
-##STEP 3: TRANSLATE FASTQ AND PILEUP##
-
-H) Translate FASTQ file with translate_fastq.py
-	
-	By default, translate_fastq.py outputs a FASTA file in which each read is named
-	by the FASTQ read. It can output a FASTQ file that adds a quality score for each
-	codon (defined by --quality (mean, sum, min), this overrides the fasta output).
-	It can also output a plaintext file with a single translated read per line (by
-	using --nofasta). For sequence_pileup.py, output a FASTA file (without using
-	--nofasta or --quality).
-
-	If your amplicon sequence is not in-frame, you must set --offset (I've set it at
-	1 here), as that will start the translation in the correct frame.
-
-	python translate_fastq.py --fastq ALL.fq --offset 1 > TRANSLATION.txt
-
-I) Calculate pileup of protein sequence
-
-	sequence_pileup.py makes a pileup a la pysamstats. For each residue in the
-	translation, outputs the number of times each amino acid is found.
-
-	python sequence_pileup.py -r TRANSLATION.TXT --protein > PILEUP.txt
+	The pileup is printed to STDOUT as a tab-delimited table.
